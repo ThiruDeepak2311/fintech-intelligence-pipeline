@@ -42,33 +42,39 @@ class FintechPipeline:
         
         # Step 2: Store in database
         print("\n💾 Step 2: Storing data in database...")
+        metrics_id = None
+        session = None
+        
         try:
-            session = self.db.get_session()
-            
-            # Create daily metrics record
-            metrics = DailyMetrics(
-                date=stock_data['date'],
-                symbol=stock_data['symbol'],
-                open_price=stock_data['open_price'],
-                close_price=stock_data['close_price'],
-                high_price=stock_data['high_price'],
-                low_price=stock_data['low_price'],
-                volume=stock_data['volume'],
-                vwap=stock_data['vwap'],
-                transactions=stock_data['transactions'],
-                raw_data=stock_data['raw_data']
-            )
-            
-            session.add(metrics)
-            session.commit()
-            metrics_id = metrics.id
-            print(f"✅ Data stored with ID: {metrics_id}")
-            
+            if self.db.is_connected():
+                session = self.db.get_session()
+                
+                # Create daily metrics record
+                metrics = DailyMetrics(
+                    date=stock_data['date'],
+                    symbol=stock_data['symbol'],
+                    open_price=stock_data['open_price'],
+                    close_price=stock_data['close_price'],
+                    high_price=stock_data['high_price'],
+                    low_price=stock_data['low_price'],
+                    volume=stock_data['volume'],
+                    vwap=stock_data['vwap'],
+                    transactions=stock_data['transactions'],
+                    raw_data=stock_data['raw_data']
+                )
+                
+                session.add(metrics)
+                session.commit()
+                metrics_id = metrics.id
+                print(f"✅ Data stored with ID: {metrics_id}")
+            else:
+                print("⚠️  Database not available - skipping storage")
+                
         except Exception as e:
             print(f"❌ Database error: {e}")
             print("⚠️  Continuing with in-memory analysis...")
-            metrics_id = None
-            session = None
+            if session:
+                session.rollback()
         
         # Step 3: LLM Analysis
         print("\n🤖 Step 3: Generating LLM analysis...")
@@ -83,7 +89,7 @@ class FintechPipeline:
         # Step 4: Store AI recommendations
         print("\n📊 Step 4: Storing AI recommendations...")
         try:
-            if session and metrics_id:
+            if session and metrics_id and self.db.is_connected():
                 recommendation = AIRecommendations(
                     date=target_date,
                     metrics_id=metrics_id,
@@ -104,6 +110,8 @@ class FintechPipeline:
                 
         except Exception as e:
             print(f"❌ Failed to store recommendations: {e}")
+            if session:
+                session.close()
         
         # Step 5: Display results
         self._display_results(stock_data, analysis)
@@ -148,9 +156,12 @@ def main():
     # Initialize pipeline
     pipeline = FintechPipeline()
     
-    # Create database tables (if not exists)
+    # Create database tables (if connected)
     try:
-        pipeline.db.create_tables()
+        if pipeline.db.is_connected():
+            pipeline.db.create_tables()
+        else:
+            print("📝 Note: Pipeline will run in analysis-only mode")
     except Exception as e:
         print(f"⚠️  Database setup skipped: {e}")
         print("📝 Note: Pipeline will run in analysis-only mode")

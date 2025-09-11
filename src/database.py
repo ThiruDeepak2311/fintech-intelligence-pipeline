@@ -44,24 +44,56 @@ class AIRecommendations(Base):
 class DatabaseManager:
     def __init__(self):
         self.database_url = os.getenv('DATABASE_URL')
-        self.engine = create_engine(self.database_url)
-        self.SessionLocal = sessionmaker(bind=self.engine)
+        
+        # Handle missing DATABASE_URL gracefully
+        if not self.database_url:
+            print("⚠️  No DATABASE_URL found - running in analysis-only mode")
+            self.engine = None
+            self.SessionLocal = None
+            return
+            
+        try:
+            self.engine = create_engine(self.database_url)
+            self.SessionLocal = sessionmaker(bind=self.engine)
+            print("✅ Database connection established")
+        except Exception as e:
+            print(f"⚠️  Database connection failed: {e}")
+            self.engine = None
+            self.SessionLocal = None
     
     def create_tables(self):
         """Create all tables"""
-        Base.metadata.create_all(bind=self.engine)
-        print("✅ Database tables created successfully!")
+        if not self.engine:
+            print("⚠️  Skipping table creation - no database connection")
+            return False
+            
+        try:
+            Base.metadata.create_all(bind=self.engine)
+            print("✅ Database tables created successfully!")
+            return True
+        except Exception as e:
+            print(f"❌ Failed to create tables: {e}")
+            return False
     
     def get_session(self):
         """Get database session"""
+        if not self.SessionLocal:
+            return None
         return self.SessionLocal()
+    
+    def is_connected(self):
+        """Check if database is connected"""
+        return self.engine is not None
 
 # Test function
 def test_database():
     print("🔧 Testing database connection...")
     try:
         db = DatabaseManager()
-        print("✅ Database manager created!")
+        if db.is_connected():
+            print("✅ Database manager created and connected!")
+        else:
+            print("⚠️  Database manager created but not connected")
         return True
     except Exception as e:
         print(f"❌ Database error: {e}")
