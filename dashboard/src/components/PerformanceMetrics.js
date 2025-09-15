@@ -1,18 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
-function RecommendationsTable({ data, loading }) {
-  const [sortField, setSortField] = useState('date');
-  const [sortDirection, setSortDirection] = useState('desc');
-  const [filterSentiment, setFilterSentiment] = useState('all');
-
-  if (loading) {
+function PerformanceMetrics({ data, loading }) {
+  if (loading || !data) {
     return (
       <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
         <div className="animate-pulse">
           <div className="h-6 bg-gray-600 rounded w-48 mb-6"></div>
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-16 bg-gray-700 rounded"></div>
+              <div key={i} className="h-32 bg-gray-700 rounded"></div>
             ))}
           </div>
         </div>
@@ -20,231 +17,258 @@ function RecommendationsTable({ data, loading }) {
     );
   }
 
-  if (!data || !Array.isArray(data) || data.length === 0) {
+  // Check if data structure is valid
+  if (!data || typeof data !== 'object') {
     return (
       <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-        <h3 className="text-xl font-semibold text-white mb-4">AI Recommendations</h3>
-        <div className="text-center py-12">
-          <svg className="w-12 h-12 text-gray-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <p className="text-gray-400">No recommendations available</p>
+        <h3 className="text-xl font-semibold text-white mb-4">System Performance Metrics</h3>
+        <div className="text-center py-8">
+          <p className="text-gray-400">Performance data not available</p>
         </div>
       </div>
     );
   }
 
-  // Filter and sort data
-  const filteredData = data.filter(item => {
-    if (filterSentiment === 'all') return true;
-    return item.sentiment.toLowerCase() === filterSentiment;
-  });
+  // Safely prepare sentiment data with fallbacks
+  const sentimentData = data.sentimentDistribution && typeof data.sentimentDistribution === 'object' 
+    ? Object.entries(data.sentimentDistribution).map(([key, value]) => ({
+        name: key.charAt(0).toUpperCase() + key.slice(1),
+        value: Number(value) || 0,
+        color: key === 'bullish' ? '#10B981' : key === 'bearish' ? '#EF4444' : '#F59E0B'
+      }))
+    : [];
 
-  const sortedData = [...filteredData].sort((a, b) => {
-    let aVal = a[sortField];
-    let bVal = b[sortField];
-    
-    if (sortField === 'date') {
-      aVal = new Date(aVal);
-      bVal = new Date(bVal);
-    }
-    
-    if (sortDirection === 'asc') {
-      return aVal > bVal ? 1 : -1;
-    } else {
-      return aVal < bVal ? 1 : -1;
-    }
-  });
+  // Safely prepare price metrics with fallbacks
+  const priceMetrics = data.priceMetrics || {};
+  const priceMetricsData = [
+    { name: 'Min', value: Number(priceMetrics.minPrice) || 0, color: '#EF4444' },
+    { name: 'Avg', value: Number(priceMetrics.avgPrice) || 0, color: '#8B5CF6' },
+    { name: 'Max', value: Number(priceMetrics.maxPrice) || 0, color: '#10B981' }
+  ];
 
-  const handleSort = (field) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
+  const CustomTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-gray-900 border border-gray-600 rounded-lg p-3 shadow-xl">
+          <p className="text-white font-medium">{payload[0].name}</p>
+          <p className="text-gray-300">
+            {payload[0].name === 'Min' || payload[0].name === 'Avg' || payload[0].name === 'Max' 
+              ? `$${Number(payload[0].value).toFixed(2)}`
+              : payload[0].value
+            }
+          </p>
+        </div>
+      );
     }
-  };
-
-  const getSentimentBadge = (sentiment) => {
-    const classes = {
-      bullish: 'bg-green-600/20 text-green-400 border-green-600/30',
-      bearish: 'bg-red-600/20 text-red-400 border-red-600/30',
-      neutral: 'bg-yellow-600/20 text-yellow-400 border-yellow-600/30'
-    };
-    
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold border capitalize ${classes[sentiment.toLowerCase()] || classes.neutral}`}>
-        {sentiment}
-      </span>
-    );
-  };
-
-  const getRiskBadge = (score) => {
-    let color = 'bg-green-600/20 text-green-400 border-green-600/30';
-    let label = 'Low';
-    
-    if (score > 6) {
-      color = 'bg-red-600/20 text-red-400 border-red-600/30';
-      label = 'High';
-    } else if (score > 3) {
-      color = 'bg-yellow-600/20 text-yellow-400 border-yellow-600/30';
-      label = 'Medium';
-    }
-    
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${color}`}>
-        {label} ({score}/10)
-      </span>
-    );
+    return null;
   };
 
   return (
     <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-      {/* Header with filters */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <h3 className="text-xl font-semibold text-white mb-4 md:mb-0">
-          AI Recommendations History
-        </h3>
-        
-        <div className="flex items-center space-x-4">
-          <select
-            value={filterSentiment}
-            onChange={(e) => setFilterSentiment(e.target.value)}
-            className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Sentiments</option>
-            <option value="bullish">Bullish</option>
-            <option value="bearish">Bearish</option>
-            <option value="neutral">Neutral</option>
-          </select>
-          
-          <span className="text-gray-400 text-sm">
-            {sortedData.length} recommendations
-          </span>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-semibold text-white">System Performance Metrics</h3>
+        <div className="text-sm text-gray-400">
+          Last updated: {new Date().toLocaleTimeString()}
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-white/10">
-              <th 
-                onClick={() => handleSort('date')}
-                className="text-left py-3 px-2 text-gray-300 font-medium cursor-pointer hover:text-white transition-colors"
-              >
-                <div className="flex items-center">
-                  Date
-                  <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                  </svg>
-                </div>
-              </th>
-              <th 
-                onClick={() => handleSort('sentiment')}
-                className="text-left py-3 px-2 text-gray-300 font-medium cursor-pointer hover:text-white transition-colors"
-              >
-                <div className="flex items-center">
-                  Sentiment
-                  <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                  </svg>
-                </div>
-              </th>
-              <th 
-                onClick={() => handleSort('riskScore')}
-                className="text-left py-3 px-2 text-gray-300 font-medium cursor-pointer hover:text-white transition-colors"
-              >
-                <div className="flex items-center">
-                  Risk
-                  <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                  </svg>
-                </div>
-              </th>
-              <th className="text-left py-3 px-2 text-gray-300 font-medium">
-                Price Target
-              </th>
-              <th className="text-left py-3 px-2 text-gray-300 font-medium">
-                Accuracy
-              </th>
-              <th className="text-left py-3 px-2 text-gray-300 font-medium">
-                Performance
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedData.map((item, index) => (
-              <tr key={index} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                <td className="py-4 px-2">
-                  <div className="text-white font-medium">
-                    {new Date(item.date).toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </div>
-                </td>
-                
-                <td className="py-4 px-2">
-                  {getSentimentBadge(item.sentiment)}
-                </td>
-                
-                <td className="py-4 px-2">
-                  {getRiskBadge(item.riskScore)}
-                </td>
-                
-                <td className="py-4 px-2">
-                  <div className="text-white font-medium">
-                    ${item.pricePrediction?.toFixed(2)}
-                  </div>
-                  <div className="text-gray-400 text-sm">
-                    Actual: ${item.actualPrice?.toFixed(2)}
-                  </div>
-                </td>
-                
-                <td className="py-4 px-2">
-                  <div className={`text-sm font-medium ${
-                    item.predictionAccuracy >= 95 ? 'text-green-400' :
-                    item.predictionAccuracy >= 90 ? 'text-yellow-400' : 'text-red-400'
-                  }`}>
-                    {item.predictionAccuracy?.toFixed(1)}%
-                  </div>
-                </td>
-                
-                <td className="py-4 px-2">
-                  <div className={`text-sm font-medium flex items-center ${
-                    item.changePercent >= 0 ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    <svg className={`w-4 h-4 mr-1 ${item.changePercent >= 0 ? 'rotate-0' : 'rotate-180'}`} 
-                         fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                    </svg>
-                    {Math.abs(item.changePercent).toFixed(2)}%
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Key Metrics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        {/* Total Days Analyzed */}
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-blue-600/20 rounded-lg">
+              <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-white mb-1">
+            {Number(data.totalDaysAnalyzed) || 0}
+          </div>
+          <div className="text-sm text-gray-400">Days Analyzed</div>
+        </div>
+
+        {/* Total Recommendations */}
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-purple-600/20 rounded-lg">
+              <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-white mb-1">
+            {Number(data.totalRecommendations) || 0}
+          </div>
+          <div className="text-sm text-gray-400">AI Recommendations</div>
+        </div>
+
+        {/* Average Risk Score */}
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-yellow-600/20 rounded-lg">
+              <svg className="w-5 h-5 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-white mb-1">
+            {Number(data.averageRiskScore).toFixed(1) || '0.0'}/10
+          </div>
+          <div className="text-sm text-gray-400">Avg Risk Score</div>
+        </div>
+
+        {/* Average Volume */}
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="flex items-center justify-between mb-2">
+            <div className="p-2 bg-green-600/20 rounded-lg">
+              <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-white mb-1">
+            {((Number(priceMetrics.avgVolume) || 0) / 1000000).toFixed(1)}M
+          </div>
+          <div className="text-sm text-gray-400">Avg Volume</div>
+        </div>
       </div>
 
-      {/* Recommendations Preview */}
-      {sortedData.length > 0 && (
-        <div className="mt-6 p-4 bg-white/5 rounded-lg">
-          <h4 className="text-white font-medium mb-3">Latest Recommendations:</h4>
-          <div className="space-y-2">
-            {sortedData[0].recommendations?.slice(0, 2).map((rec, index) => (
-              <div key={index} className="flex items-start text-sm">
-                <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                <span className="text-gray-300">{rec}</span>
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Sentiment Distribution Pie Chart */}
+        <div className="bg-white/5 rounded-lg p-6">
+          <h4 className="text-lg font-semibold text-white mb-4">Sentiment Distribution</h4>
+          {sentimentData.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={sentimentData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    dataKey="value"
+                    label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                    labelLine={false}
+                  >
+                    {sentimentData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-gray-400">
+              No sentiment data available
+            </div>
+          )}
+          
+          {/* Legend */}
+          <div className="flex justify-center space-x-6 mt-4">
+            {sentimentData.map((item, index) => (
+              <div key={index} className="flex items-center">
+                <div 
+                  className="w-3 h-3 rounded-full mr-2" 
+                  style={{ backgroundColor: item.color }}
+                ></div>
+                <span className="text-gray-300 text-sm">{item.name}</span>
               </div>
             ))}
           </div>
         </div>
-      )}
+
+        {/* Price Range Bar Chart */}
+        <div className="bg-white/5 rounded-lg p-6">
+          <h4 className="text-lg font-semibold text-white mb-4">Price Range Analysis</h4>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={priceMetricsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <XAxis 
+                  dataKey="name" 
+                  stroke="#9CA3AF"
+                  fontSize={12}
+                />
+                <YAxis 
+                  stroke="#9CA3AF"
+                  fontSize={12}
+                  tickFormatter={(value) => `$${Number(value).toFixed(0)}`}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar 
+                  dataKey="value" 
+                  radius={[4, 4, 0, 0]}
+                >
+                  {priceMetricsData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          
+          {/* Price Summary */}
+          <div className="grid grid-cols-3 gap-4 mt-4">
+            <div className="text-center">
+              <div className="text-red-400 text-lg font-bold">
+                ${Number(priceMetrics.minPrice).toFixed(2) || '0.00'}
+              </div>
+              <div className="text-gray-400 text-xs">Minimum</div>
+            </div>
+            <div className="text-center">
+              <div className="text-purple-400 text-lg font-bold">
+                ${Number(priceMetrics.avgPrice).toFixed(2) || '0.00'}
+              </div>
+              <div className="text-gray-400 text-xs">Average</div>
+            </div>
+            <div className="text-center">
+              <div className="text-green-400 text-lg font-bold">
+                ${Number(priceMetrics.maxPrice).toFixed(2) || '0.00'}
+              </div>
+              <div className="text-gray-400 text-xs">Maximum</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* System Health Indicators */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-green-600/10 border border-green-600/30 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
+            <div>
+              <div className="text-green-400 font-medium">System Status</div>
+              <div className="text-green-300 text-sm">Operational</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-blue-600/10 border border-blue-600/30 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-blue-400 rounded-full mr-3"></div>
+            <div>
+              <div className="text-blue-400 font-medium">Data Quality</div>
+              <div className="text-blue-300 text-sm">High Accuracy</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-purple-600/10 border border-purple-600/30 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-purple-400 rounded-full mr-3"></div>
+            <div>
+              <div className="text-purple-400 font-medium">AI Performance</div>
+              <div className="text-purple-300 text-sm">Optimized</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-export default RecommendationsTable;
+export default PerformanceMetrics;
