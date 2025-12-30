@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import databaseService from './services/database';
 import StockOverview from './components/StockOverview';
-import PriceChart from './components/PriceChart';
 import AIAnalysis from './components/AIAnalysis';
 import RecommendationsTable from './components/RecommendationsTable';
 import PerformanceMetrics from './components/PerformanceMetrics';
@@ -9,7 +8,6 @@ import LoadingSpinner from './components/LoadingSpinner';
 
 function App() {
   const [latestData, setLatestData] = useState(null);
-  const [historicalData, setHistoricalData] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25,15 +23,13 @@ function App() {
       console.log('Fetching dashboard data...');
 
       // Fetch all data in parallel for better performance
-      const [latest, historical, recs, performanceMetrics] = await Promise.all([
+      const [latest, recs, performanceMetrics] = await Promise.all([
         databaseService.getLatestStockData(),
-        databaseService.getHistoricalData(30),
         databaseService.getAllRecommendations(),
         databaseService.getPerformanceMetrics()
       ]);
 
       setLatestData(latest);
-      setHistoricalData(historical);
       setRecommendations(recs);
       setMetrics(performanceMetrics);
       setLastUpdated(new Date());
@@ -143,25 +139,13 @@ function App() {
           />
         )}
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-8">
-          {/* Price Chart - Takes up 2 columns on xl screens */}
-          <div className="xl:col-span-2">
-            <PriceChart 
-              data={historicalData}
-              symbol={latestData?.symbol}
-              loading={loading}
-            />
-          </div>
-
-          {/* AI Analysis Panel */}
-          <div className="xl:col-span-1">
-            <AIAnalysis 
-              data={latestData?.aiAnalysis}
-              stockData={latestData?.stockData}
-              loading={loading}
-            />
-          </div>
+        {/* AI Analysis Panel - Now Full Width */}
+        <div className="mt-8">
+          <AIAnalysis 
+            data={latestData?.aiAnalysis}
+            stockData={latestData?.stockData}
+            loading={loading}
+          />
         </div>
 
         {/* Performance Metrics */}
